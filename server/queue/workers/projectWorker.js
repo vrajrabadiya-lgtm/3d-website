@@ -6,6 +6,8 @@ import { generateBlueprint } from "../../core/BlueprintGenerator.js";
 import { runThreeDSceneAgent } from "../../core/AgentWebsiteOrchestrator.js";
 import { generateAllCode } from "../../core/CodeGenerator.js";
 import { logger } from "../../core/logger.js";
+import { ProjectBuilder } from "../../core/ProjectBuilder.js";
+import { BuildDiagnostics } from "../../core/BuildDiagnostics.js";
 
 const QUEUE_NAME = "ProjectQueue";
 
@@ -154,9 +156,65 @@ export const projectWorker = new Worker(
       // 6. Thumbnail Generation (Skipped)
       currentStage = "Thumbnail Generation";
       logger.job(jobId, projectId, currentStage, "Thumbnail skipped");
-      await updateProgress(project, 95, "Thumbnail Generation");
+      await updateProgress(project, 90, "Thumbnail Generation");
       
-      // 7. Completion
+      // Initialize Builder
+      const builder = new ProjectBuilder(projectId);
+
+      try {
+        // 7. Project Builder
+        currentStage = "Project Builder";
+        logger.job(jobId, projectId, currentStage, "Project Builder Started");
+        await builder.setupProject(project);
+        await updateProgress(project, 94, "Project Builder");
+
+        // 8. Build Verification
+        currentStage = "Build Verification";
+        logger.job(jobId, projectId, currentStage, "Build Started");
+        const buildResults = await builder.verifyBuild();
+        project.buildStatus = buildResults.status;
+        project.buildLogs = buildResults.logs;
+        project.buildStartedAt = buildResults.startedAt;
+        project.buildCompletedAt = buildResults.completedAt;
+        if (buildResults.error || buildResults.status === "FAILED") {
+          logger.warn(`Build verification failed but continuing: ${buildResults.error || 'Build script failed'}`);
+          
+          logger.job(jobId, projectId, "Build Diagnostics Started", "Analyzing build failure logs");
+          const diagnostics = BuildDiagnostics.analyzeLogs(buildResults.logs);
+          project.buildDiagnostics = diagnostics;
+          logger.job(jobId, projectId, "Detected Category", diagnostics.category);
+          logger.job(jobId, projectId, "Detected Summary", diagnostics.summary);
+          logger.job(jobId, projectId, "Diagnostics Stored", "Structured diagnostics saved to MongoDB");
+        } else {
+          logger.job(jobId, projectId, currentStage, "Build Completed");
+        }
+        await project.save();
+        await updateProgress(project, 97, "Build Verification");
+
+        // 9. ZIP Generation
+        currentStage = "ZIP Generation";
+        logger.job(jobId, projectId, currentStage, "ZIP Started");
+        const zipMetadata = await builder.generateZip();
+        project.artifact = zipMetadata;
+        logger.job(jobId, projectId, currentStage, "ZIP Completed");
+        logger.job(jobId, projectId, "Artifact Storage", "Artifact Stored");
+        await project.save();
+        await updateProgress(project, 99, "ZIP Generation");
+        
+        // 10. Cleanup
+        await builder.cleanup();
+
+      } catch (builderError) {
+        logger.error(`Builder failed at ${currentStage}`, builderError, { jobId, projectId });
+        
+        // If zip failed, try cleanup anyway
+        await builder.cleanup();
+        
+        // Let it throw so it gets caught by the main catch block and sets project to FAILED
+        throw builderError;
+      }
+      
+      // 11. Completion
       currentStage = "Completion";
       project.status = "COMPLETED";
       project.progress = 100;

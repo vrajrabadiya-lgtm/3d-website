@@ -59,6 +59,26 @@ const projectSchema = new mongoose.Schema(
     completedAt: {
       type: Date,
     },
+    buildStatus: {
+      type: String,
+      enum: ["PENDING", "SUCCESS", "FAILED"],
+      default: "PENDING",
+    },
+    buildLogs: {
+      type: String,
+    },
+    buildStartedAt: {
+      type: Date,
+    },
+    buildCompletedAt: {
+      type: Date,
+    },
+    buildDiagnostics: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    artifact: {
+      type: mongoose.Schema.Types.Mixed,
+    },
     error: {
       message: String,
       errorType: String,
