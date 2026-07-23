@@ -1,10 +1,27 @@
-# Migration Plan: Supabase → MongoDB
+# Fix Plan for AI 3D Website Generation Errors
 
-## Steps
+## Issues Found:
+1. **Port Mismatch**: Client Builder.jsx uses port 3000, server runs on 5000
+2. **AI Pipeline Crashes**: AgentWebsiteOrchestrator.js calls AI APIs without graceful fallback
+3. **Missing Config Validation**: No helpful error messages when API keys are missing
+4. **Response Structure Mismatch**: Frontend expects specific structure from backend
 
-- [x] 1. Create `.env` file with all API keys and MongoDB URI
-- [x] 2. Update `server/models/User.js` — Add credit fields (plan, builds_used, builds_limit, etc.)
-- [x] 3. Update `server/lib/ai-clients.js` — Remove Supabase, replace with MongoDB-based credit resolution
-- [x] 4. Update `server/routes/ai.js` — Use MongoDB credit system (no changes needed, already compatible)
-- [x] 5. Update `server/package.json` — Remove @supabase/supabase-js dependency
-- [x] 6. Install dependencies and verify server starts
+## Steps:
+
+### Step 1: Fix Port Mismatch
+- [x] Fix `Builder.jsx` to use port 5000 instead of 3000
+
+### Step 2: Add Graceful Fallback in Route + Orchestrator
+- [x] Fix `routes/ai.js` to catch pipeline errors and fallback to local generation
+- [x] Update `AgentWebsiteOrchestrator.js` to handle AI API failures gracefully
+
+### Step 3: Fix Response Structure in AI Route
+- [x] Update `routes/ai.js` to match what frontend expects (added config status, graceful fallback)
+
+### Step 4: Add Configuration Validation
+- [x] Add helpful error messages when API keys are missing
+- [x] Ensure graceful degradation (local fallback when AI APIs unavailable)
+
+### Step 5: Test & Verify
+- [x] Start the server
+- [x] Verify the API endpoints work

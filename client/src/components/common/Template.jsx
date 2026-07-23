@@ -6,7 +6,7 @@ export default function TemplatesShowcase() {
         {
             title: "Meridian",
             subtitle: "Cinematic scroll",
-            subdomain: "meridian.ornitech.space",
+            subdomain: "meridian.Shapentic.space",
             tags: ["Scroll Theatre", "Volume dash", "Textures"],
             color: "from-blue-500 to-indigo-600",
             glow: "group-hover:border-blue-500/30 group-hover:shadow-[0_0_40px_rgba(59,130,246,0.15)]",
@@ -15,7 +15,7 @@ export default function TemplatesShowcase() {
         {
             title: "TripVault",
             subtitle: "Travel Experience",
-            subdomain: "tripvault.ornitech.space",
+            subdomain: "tripvault.Shapentic.space",
             tags: ["Travel", "SaaS", "Glass Sky"],
             color: "from-cyan-400 to-blue-500",
             glow: "group-hover:border-cyan-500/30 group-hover:shadow-[0_0_40px_rgba(34,211,238,0.15)]",
@@ -24,7 +24,7 @@ export default function TemplatesShowcase() {
         {
             title: "Shopnest",
             subtitle: "Ecommerce Platform",
-            subdomain: "shopnest.ornitech.space",
+            subdomain: "shopnest.Shapentic.space",
             tags: ["Ecommerce", "Framer", "3D Objects"],
             color: "from-pink-500 to-rose-600",
             glow: "group-hover:border-pink-500/30 group-hover:shadow-[0_0_40px_rgba(244,63,94,0.15)]",
@@ -33,7 +33,7 @@ export default function TemplatesShowcase() {
         {
             title: "OrbitCRM",
             subtitle: "Agency CRM",
-            subdomain: "orbitcrm.ornitech.space",
+            subdomain: "orbitcrm.Shapentic.space",
             tags: ["Agency", "Glass UI", "Nebula V2"],
             color: "from-purple-500 to-indigo-500",
             glow: "group-hover:border-purple-500/30 group-hover:shadow-[0_0_40px_rgba(168,85,247,0.15)]",
@@ -42,7 +42,7 @@ export default function TemplatesShowcase() {
         {
             title: "SyncBase",
             subtitle: "Team Collaboration",
-            subdomain: "syncbase.ornitech.space",
+            subdomain: "syncbase.Shapentic.space",
             tags: ["Productivity", "SaaS", "Light UI"],
             color: "from-emerald-400 to-teal-500",
             glow: "group-hover:border-emerald-500/30 group-hover:shadow-[0_0_40px_rgba(52,211,153,0.15)]",
@@ -51,7 +51,7 @@ export default function TemplatesShowcase() {
         {
             title: "StackForge",
             subtitle: "Dev Platform",
-            subdomain: "stackforge.ornitech.space",
+            subdomain: "stackforge.Shapentic.space",
             tags: ["Dev Tools", "Dark", "Bold World"],
             color: "from-violet-500 to-fuchsia-500",
             glow: "group-hover:border-violet-500/30 group-hover:shadow-[0_0_40px_rgba(139,92,246,0.15)]",
@@ -60,7 +60,7 @@ export default function TemplatesShowcase() {
         {
             title: "VisionForge",
             subtitle: "AI Video Studio",
-            subdomain: "visionforge.ornitech.space",
+            subdomain: "visionforge.Shapentic.space",
             tags: ["AI", "Video", "Cinematic"],
             color: "from-amber-500 to-orange-600",
             glow: "group-hover:border-amber-500/30 group-hover:shadow-[0_0_40px_rgba(245,158,11,0.15)]",
@@ -101,7 +101,7 @@ export default function TemplatesShowcase() {
                                     className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                                
+
                                 {/* Browser-like top bar */}
                                 <div className="absolute top-0 left-0 right-0 h-6 bg-black/70 flex items-center px-3 gap-1.5">
                                     <div className="flex gap-1">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Center, Float, OrbitControls } from "@react-three/drei";
+import GeneratedWebsitePreview from "./GeneratedWebsitePreview";
 import {
   Palette,
   Layers,
@@ -17,6 +18,7 @@ import {
   Code2,
   Eye,
   X,
+  Globe,
 } from "lucide-react";
 
 // Interactive 3D Model that dynamically reflects state variables
@@ -127,7 +129,7 @@ export default function Builder() {
   const loggedInUser = getLoggedInUser();
   const [userId, setUserId] = useState(loggedInUser?.id || loggedInUser?._id || "user_demo");
   const [designName, setDesignName] = useState("Cyber Torus");
-  
+
   // Customization variables
   const [color, setColor] = useState("#3b82f6");
   const [lightColor, setLightColor] = useState("#ffffff");
@@ -146,7 +148,7 @@ export default function Builder() {
 
   // 3. AI Generated Website State
   const [aiResult, setAiResult] = useState(null);
-  const [aiView, setAiView] = useState("preview"); // "preview" | "hero" | "scene" | "section"
+  const [showPreview, setShowPreview] = useState(false);
 
   // Load AI result from sessionStorage on mount
   useEffect(() => {
@@ -158,11 +160,11 @@ export default function Builder() {
           setAiResult(parsed);
           sessionStorage.removeItem("ai_result");
         }
-      } catch {}
+      } catch { }
     }
   }, []);
 
-  const BACKEND_URL = `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/designs`;
+  const BACKEND_URL = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/designs`;
 
   // Fetch designs for the current user
   const fetchUserDesigns = async (targetUid = userId) => {
@@ -218,7 +220,7 @@ export default function Builder() {
 
       const savedData = await response.json();
       setApiStatus({ type: "success", message: `Successfully saved "${designName}"!` });
-      
+
       // Refresh design feed
       fetchUserDesigns(userId);
     } catch (err) {
@@ -252,7 +254,7 @@ export default function Builder() {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Delete failed.");
-      
+
       setSavedDesigns((prev) => prev.filter((d) => d._id !== id));
       setApiStatus({ type: "success", message: "Project deleted successfully." });
     } catch (error) {
@@ -286,157 +288,24 @@ export default function Builder() {
 
   return (
     <div className="h-screen w-full bg-zinc-950 text-white font-sans flex flex-col md:flex-row overflow-hidden relative">
-      
+
       {/* Background visual ambience */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,#090d16,transparent_60%)] pointer-events-none" />
 
       {/* ── AI GENERATED WEBSITE PREVIEW PANEL ─────────────────────────── */}
-      {aiResult && (
-        <div className="absolute inset-0 z-50 bg-zinc-950 flex flex-col">
-          {/* Panel Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-zinc-900/80 backdrop-blur-xl shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                AI Generated
-              </div>
-              <span className="text-xs font-semibold text-zinc-300">3 Components Ready</span>
-            </div>
-
-            {/* Tab switcher */}
-            <div className="flex items-center gap-1 bg-zinc-800/60 rounded-lg p-1">
-              {[
-                { id: "preview", label: "Preview" },
-                { id: "hero",    label: "Hero JSX" },
-                { id: "scene",   label: "Scene JSX" },
-                { id: "section", label: "Section JSX" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setAiView(tab.id)}
-                  className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
-                    aiView === tab.id
-                      ? "bg-zinc-700 text-white"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setAiResult(null)}
-              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Panel Body */}
-          <div className="flex-1 overflow-hidden">
-            {aiView === "preview" ? (
-              // Live preview: show design system info + component summary
-              <div className="h-full overflow-y-auto p-6 space-y-6">
-                {/* Design System */}
-                {aiResult.designSystem && Object.keys(aiResult.designSystem).length > 0 && (
-                  <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-5">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-4">Design System</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {["background", "primary", "secondary", "accent"].map((key) => {
-                        const val = aiResult.designSystem[key];
-                        if (!val || !val.startsWith("#")) return null;
-                        return (
-                          <div key={key} className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg border border-white/10 shrink-0" style={{ background: val }} />
-                            <div>
-                              <div className="text-[10px] text-zinc-500 capitalize">{key}</div>
-                              <div className="text-[11px] font-mono text-zinc-300">{val}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 3 Component Cards */}
-                <div className="grid md:grid-cols-3 gap-4">
-                  {[
-                    { label: "Hero Component",    key: "heroJSX",       icon: "🖼️",  desc: "Full-screen hero section with 3D canvas" },
-                    { label: "3D Scene",           key: "sceneJSX",      icon: "🌐",  desc: "React Three Fiber cinematic scene" },
-                    { label: "Features Section",  key: "sampleSection", icon: "⚡",  desc: "Industry-specific features layout" },
-                  ].map((comp) => (
-                    <div
-                      key={comp.key}
-                      className="rounded-2xl border border-white/10 bg-zinc-900/40 p-5 flex flex-col gap-3"
-                    >
-                      <div className="text-3xl">{comp.icon}</div>
-                      <div>
-                        <div className="text-sm font-bold text-zinc-100">{comp.label}</div>
-                        <div className="text-[11px] text-zinc-500 mt-0.5">{comp.desc}</div>
-                      </div>
-                      <div className="mt-auto flex items-center justify-between">
-                        <span className="text-[10px] text-emerald-400 font-semibold">✓ Ready</span>
-                        <button
-                          onClick={() => setAiView(comp.key === "heroJSX" ? "hero" : comp.key === "sceneJSX" ? "scene" : "section")}
-                          className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-                        >
-                          <Code2 className="h-3 w-3" />
-                          View Code
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Install command */}
-                {aiResult.components?.installCmd && (
-                  <div className="rounded-xl border border-white/10 bg-zinc-900/60 p-4">
-                    <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">Install Dependencies</div>
-                    <code className="text-[11px] font-mono text-emerald-300 break-all">{aiResult.components.installCmd}</code>
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Code view
-              <div className="h-full flex flex-col">
-                <div className="flex items-center gap-2 px-5 py-2.5 border-b border-white/10 bg-zinc-900/40 shrink-0">
-                  <Code2 className="h-3.5 w-3.5 text-zinc-400" />
-                  <span className="text-[11px] font-mono text-zinc-400">
-                    {aiView === "hero" ? "Hero.jsx" : aiView === "scene" ? "Cinematic3DScene.jsx" : "FeaturesSection.jsx"}
-                  </span>
-                  <button
-                    onClick={() => {
-                      const code = aiView === "hero"
-                        ? aiResult.components.heroJSX
-                        : aiView === "scene"
-                        ? aiResult.components.sceneJSX
-                        : aiResult.components.sampleSection;
-                      navigator.clipboard.writeText(code);
-                      setApiStatus({ type: "success", message: "Code copied to clipboard!" });
-                    }}
-                    className="ml-auto text-[10px] text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre className="flex-1 overflow-auto p-5 text-[11px] font-mono text-zinc-300 leading-relaxed whitespace-pre-wrap break-words">
-                  {aiView === "hero"
-                    ? aiResult.components.heroJSX
-                    : aiView === "scene"
-                    ? aiResult.components.sceneJSX
-                    : aiResult.components.sampleSection}
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
+      {(aiResult || showPreview) && (
+        <GeneratedWebsitePreview
+          aiResult={aiResult}
+          onClose={() => {
+            setAiResult(null);
+            setShowPreview(false);
+          }}
+        />
       )}
 
       {/* 1. LEFT SIDEBAR PANEL: Controls */}
       <aside className="w-full md:w-[400px] border-b md:border-b-0 md:border-r border-white/10 bg-zinc-950/80 backdrop-blur-xl flex flex-col z-20 shrink-0 h-1/2 md:h-full">
-        
+
         {/* Sidebar Header */}
         <div className="p-5 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -471,11 +340,10 @@ export default function Builder() {
               <button
                 key={tab.id}
                 onClick={() => setActiveSidebarTab(tab.id)}
-                className={`py-3.5 flex flex-col items-center gap-1 transition-all border-b-2 hover:text-zinc-200 cursor-pointer ${
-                  isActive
+                className={`py-3.5 flex flex-col items-center gap-1 transition-all border-b-2 hover:text-zinc-200 cursor-pointer ${isActive
                     ? "border-blue-500 text-white bg-zinc-900/40"
                     : "border-transparent text-zinc-400 hover:bg-zinc-900/10"
-                }`}
+                  }`}
               >
                 <TabIcon className="h-4 w-4" />
                 <span>{tab.label}</span>
@@ -486,7 +354,7 @@ export default function Builder() {
 
         {/* Sidebar Content Workspace */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          
+
           {/* Tab View: COLORS */}
           {activeSidebarTab === "colors" && (
             <div className="space-y-6">
@@ -525,11 +393,10 @@ export default function Builder() {
                     <button
                       key={preset}
                       onClick={() => setColor(preset)}
-                      className={`h-7 rounded-md border transition-all cursor-pointer ${
-                        color.toLowerCase() === preset.toLowerCase()
+                      className={`h-7 rounded-md border transition-all cursor-pointer ${color.toLowerCase() === preset.toLowerCase()
                           ? "border-white scale-110 shadow-lg"
                           : "border-white/10 hover:border-white/30"
-                      }`}
+                        }`}
                       style={{ backgroundColor: preset }}
                     />
                   ))}
@@ -551,11 +418,10 @@ export default function Builder() {
                     <button
                       key={light.hex}
                       onClick={() => setLightColor(light.hex)}
-                      className={`flex-1 py-2 rounded-lg border text-[10px] font-semibold transition-all cursor-pointer ${
-                        lightColor === light.hex
+                      className={`flex-1 py-2 rounded-lg border text-[10px] font-semibold transition-all cursor-pointer ${lightColor === light.hex
                           ? "border-blue-500 bg-blue-500/10 text-white"
                           : "border-white/5 bg-zinc-900/40 text-zinc-400 hover:border-white/15"
-                      }`}
+                        }`}
                     >
                       <div
                         className="w-2.5 h-2.5 rounded-full mx-auto mb-1 border border-white/10"
@@ -610,11 +476,10 @@ export default function Builder() {
                 <button
                   key={m.id}
                   onClick={() => setMaterialType(m.id)}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center gap-4 cursor-pointer group ${
-                    materialType === m.id
+                  className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center gap-4 cursor-pointer group ${materialType === m.id
                       ? "border-blue-500 bg-blue-500/5 shadow-md shadow-blue-500/5"
                       : "border-white/5 bg-zinc-900/30 hover:border-white/10"
-                  }`}
+                    }`}
                 >
                   <div
                     className={`h-12 w-12 rounded-xl bg-gradient-to-br ${m.color} border border-white/10 shrink-0 group-hover:scale-105 transition-transform flex items-center justify-center`}
@@ -639,7 +504,7 @@ export default function Builder() {
           {/* Tab View: GEOMETRY */}
           {activeSidebarTab === "geometry" && (
             <div className="space-y-6">
-              
+
               {/* Shape Select */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">
@@ -656,11 +521,10 @@ export default function Builder() {
                     <button
                       key={s.id}
                       onClick={() => setShape(s.id)}
-                      className={`py-2 px-3 text-xs rounded-xl font-medium border text-center transition-all cursor-pointer ${
-                        shape === s.id
+                      className={`py-2 px-3 text-xs rounded-xl font-medium border text-center transition-all cursor-pointer ${shape === s.id
                           ? "border-blue-500 bg-blue-500/10 text-white"
                           : "border-white/5 bg-zinc-900/30 text-zinc-400 hover:border-white/10"
-                      }`}
+                        }`}
                     >
                       {s.name}
                     </button>
@@ -727,15 +591,14 @@ export default function Builder() {
           {/* Tab View: SAVE / SHARE */}
           {activeSidebarTab === "save" && (
             <div className="space-y-6">
-              
+
               {/* Database Status Alert banner */}
               {apiStatus.message && (
                 <div
-                  className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${
-                    apiStatus.type === "success"
+                  className={`p-3.5 rounded-xl border flex items-start gap-2.5 text-xs ${apiStatus.type === "success"
                       ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
                       : "bg-red-500/10 border-red-500/30 text-red-300"
-                  }`}
+                    }`}
                 >
                   {apiStatus.type === "success" ? (
                     <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
@@ -774,11 +637,10 @@ export default function Builder() {
                     value={loggedInUser ? loggedInUser.name || loggedInUser.email : userId}
                     readOnly={!!loggedInUser}
                     onChange={(e) => !loggedInUser && setUserId(e.target.value)}
-                    className={`w-full h-10 px-3 bg-zinc-900 border rounded-lg text-xs outline-none transition-colors ${
-                      loggedInUser
+                    className={`w-full h-10 px-3 bg-zinc-900 border rounded-lg text-xs outline-none transition-colors ${loggedInUser
                         ? "border-emerald-500/30 text-emerald-300 cursor-default"
                         : "border-white/10 focus:border-blue-500"
-                    }`}
+                      }`}
                   />
                   {!loggedInUser && (
                     <p className="text-[10px] text-zinc-600">
@@ -879,20 +741,20 @@ export default function Builder() {
 
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-white/10 bg-zinc-950 text-center text-[10px] text-zinc-600 font-medium">
-          MERN Connected · ORNITECH WebGL Engine v2.0.4
+          MERN Connected · Shapentic WebGL Engine v2.0.4
         </div>
       </aside>
 
       {/* 2. RIGHT VIEWPORT: 3D Render Canvas */}
       <main className="flex-1 h-1/2 md:h-full relative select-none">
-        
+
         {/* Render status overlays */}
         <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-black/60 backdrop-blur-md text-[10px] font-bold text-zinc-300">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>WebGL Render Target: Active</span>
           </div>
-          
+
           {/* Real-time AST readout */}
           <div className="px-3 py-2 rounded-xl border border-white/10 bg-black/60 backdrop-blur-md text-[9px] font-mono text-zinc-500 leading-normal hidden sm:block">
             <div className="text-zinc-300 font-semibold mb-1">AST Data:</div>
@@ -905,6 +767,13 @@ export default function Builder() {
 
         {/* Interactive Floating Canvas HUD */}
         <div className="absolute bottom-6 right-6 z-10 flex gap-2">
+          <button
+            onClick={() => setShowPreview(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xl transition-all cursor-pointer border border-blue-400/30"
+          >
+            <Globe className="h-3.5 w-3.5 text-white" />
+            <span>Preview Generated Website</span>
+          </button>
           <button
             onClick={() => {
               const url = `${window.location.origin}/#3d-builder`;
@@ -923,14 +792,14 @@ export default function Builder() {
           {/* Lighting */}
           <ambientLight intensity={0.3} />
           <pointLight position={[10, 10, 10]} intensity={0.7} />
-          
+
           {/* Main directional light reacting to customization */}
           <directionalLight
             position={[5, 5, 5]}
             intensity={1.5}
             color={lightColor}
           />
-          
+
           {/* Fill lights */}
           <directionalLight
             position={[-5, 3, 2]}

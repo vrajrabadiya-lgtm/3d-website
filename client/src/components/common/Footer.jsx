@@ -83,7 +83,7 @@ export default function Footer() {
                             <div className="h-2 w-2 rounded-sm bg-white" />
                         </div>
                         <span className="font-black text-sm tracking-widest uppercase text-white">
-                            Ornitech
+                            Shapentic
                         </span>
                     </div>
 

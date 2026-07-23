@@ -181,12 +181,12 @@ export default function PipelineSection() {
 
         {/* NEW SECTION: PREMIUM GLASSMORPHIC CONTACT FORM */}
         <div className="w-full max-w-4xl text-left border border-white/[0.06] rounded-[2.5rem] bg-gradient-to-b from-zinc-950 to-black p-8 md:p-14 relative overflow-hidden shadow-2xl">
-          
+
           {/* Subtle Ambient Glow */}
           <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start relative z-10">
-            
+
             {/* Contact details */}
             <div className="lg:col-span-5 space-y-6">
               <div>
@@ -206,7 +206,7 @@ export default function PipelineSection() {
                   <div className="h-8 w-8 rounded-lg bg-zinc-900 border border-white/5 flex items-center justify-center text-blue-400">
                     <Mail className="h-4 w-4" />
                   </div>
-                  <span>support@ornitech.space</span>
+                  <span>support@Shapentic.space</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-lg bg-zinc-900 border border-white/5 flex items-center justify-center text-purple-400">
@@ -219,14 +219,13 @@ export default function PipelineSection() {
 
             {/* Contact HTML Form */}
             <div className="lg:col-span-7 bg-zinc-900/30 border border-white/5 rounded-3xl p-6 md:p-8 backdrop-blur-xl">
-              
+
               {formStatus.text && (
                 <div
-                  className={`p-4 mb-6 rounded-xl border flex items-start gap-2.5 text-xs ${
-                    formStatus.type === "success"
+                  className={`p-4 mb-6 rounded-xl border flex items-start gap-2.5 text-xs ${formStatus.type === "success"
                       ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
                       : "bg-red-500/10 border-red-500/20 text-red-300"
-                  }`}
+                    }`}
                 >
                   {formStatus.type === "success" ? (
                     <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />

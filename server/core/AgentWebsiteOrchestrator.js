@@ -232,29 +232,53 @@ function runDeployAgent(debugReport) {
 }
 
 export async function runAgenticWebsitePipeline({ plan, prompt }) {
-  const intent = await runPlannerAgent(plan, prompt);
-  const designSystem = await runUiDesignerAgent(plan, prompt, intent);
-  const scenePlan = await runThreeDSceneAgent(
-    plan,
-    prompt,
-    intent,
-    designSystem,
+  // Wrap each agent call in try/catch so one failure doesn't crash the whole pipeline.
+  // If an agent fails, we use a sensible default for that phase and continue.
+
+  async function safeRun(agentName, fn) {
+    try {
+      return await fn();
+    } catch (err) {
+      console.warn(`[AgentWebsiteOrchestrator] ${agentName} failed: ${err.message.slice(0, 120)}`);
+      return null;
+    }
+  }
+
+  const intent = await safeRun("Planner Agent", () => runPlannerAgent(plan, prompt));
+
+  // If the planner failed, we can't proceed meaningfully — throw a clear error
+  if (!intent) {
+    throw new Error(
+      "AI Planner Agent failed. This is likely because no AI API keys are configured. " +
+      "Set ANTHROPIC_API_KEY, GROQ_API_KEY, or GOOGLE_PROJECT_ID+GOOGLE_LOCATION in your .env file, " +
+      "or use the local fallback path via /api/generate-blueprint."
+    );
+  }
+
+  const designSystem = await safeRun("UI Designer Agent", () =>
+    runUiDesignerAgent(plan, prompt, intent)
   );
-  const componentPlan = await runComponentPlannerAgent(
-    plan,
-    prompt,
-    intent,
-    designSystem,
+
+  const scenePlan = await safeRun("3D Scene Agent", () =>
+    runThreeDSceneAgent(plan, prompt, intent, designSystem || {})
   );
-  const codeOutput = await runCodeAgent(
-    plan,
-    prompt,
-    intent,
-    designSystem,
-    scenePlan,
-    componentPlan,
+
+  const componentPlan = await safeRun("Component Planner Agent", () =>
+    runComponentPlannerAgent(plan, prompt, intent, designSystem || {})
   );
-  const debugReport = runDebuggerAgent(codeOutput);
+
+  const codeOutput = await safeRun("Code Agent", () =>
+    runCodeAgent(
+      plan,
+      prompt,
+      intent,
+      designSystem || {},
+      scenePlan || {},
+      componentPlan || {},
+    )
+  );
+
+  const debugReport = runDebuggerAgent(codeOutput || { files: {} });
   const deployment = runDeployAgent(debugReport);
 
   return {

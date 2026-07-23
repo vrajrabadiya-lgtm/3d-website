@@ -46,7 +46,7 @@ router.post("/", async (req, res) => {
         const transporter = createMailTransporter();
         await transporter.sendMail({
           from: user,
-          to: "support@ornitech.in",
+          to: "support@Shapentic.in",
           subject: `New Contact Message from ${name}`,
           html: `
             <h3>New Contact Form Submission</h3>

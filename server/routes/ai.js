@@ -21,6 +21,23 @@ import { generateWebsiteBlueprint } from "../core/WebsiteBlueprintEngine.js";
 import { resolveUserCredits } from "../lib/ai-clients.js";
 import { buildLocalBlueprint } from "../core/BlueprintGenerator.js";
 
+/**
+ * Check which AI providers are configured and return a status object.
+ */
+function getConfigStatus() {
+  const providers = [];
+  if (process.env.ANTHROPIC_API_KEY) providers.push('claude');
+  if (process.env.GROQ_API_KEY) providers.push('groq');
+  if (process.env.GOOGLE_PROJECT_ID && process.env.GOOGLE_LOCATION) providers.push('gemini');
+  return {
+    hasAnyAI: providers.length > 0,
+    providers,
+    message: providers.length > 0
+      ? `AI providers configured: ${providers.join(', ')}`
+      : 'No AI API keys configured. Using local code generation (all features work, but AI-generated content uses templates).',
+  };
+}
+
 const router = Router();
 
 // ─── GET /health ──────────────────────────────────────────────────────────────
@@ -30,6 +47,12 @@ router.get("/health", (req, res) => {
     res.json({
       status: "ok",
       timestamp: new Date().toISOString(),
+      config: getConfigStatus(),
+      env: {
+        node: process.version,
+        port: process.env.PORT || 5000,
+        mongodb: !!process.env.MONGO_URI ? "configured" : "using default",
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -98,11 +121,18 @@ router.post("/generate-agentic-website", async (req, res) => {
     }
 
     const intent = analyzePrompt(prompt);
-    const result = await runAgenticWebsitePipeline({ plan: "free", prompt });
+    
+    // Try the AI pipeline first, fall back to local generation on any failure
+    let result = null;
+    let blueprint = null;
+    let designSystem = {};
 
-    // Generate the 3 renderable components from the pipeline's blueprint
-    const blueprint = result?.phases?.code?.files
-      ? {
+    try {
+      result = await runAgenticWebsitePipeline({ plan: "free", prompt });
+
+      // Generate the 3 renderable components from the pipeline's blueprint
+      if (result?.phases?.code?.files) {
+        blueprint = {
           websiteBlueprint: {
             website_name: result.phases.planner?.projectType ?? "My Site",
             business_type: result.phases.planner?.projectType ?? "technology",
@@ -126,8 +156,28 @@ router.post("/generate-agentic-website", async (req, res) => {
               ?.filter(c => !["Navbar","Footer"].includes(c.name))
               .map(c => ({ type: "features", title: c.name, id: c.name.toLowerCase() })) ?? [],
           },
-        }
-      : buildLocalBlueprint(intent);
+        };
+        designSystem = result.phases.designer ?? {};
+      }
+    } catch (pipelineErr) {
+      // Pipeline failed (likely no AI API keys). Use local fallback.
+      console.warn("[generate-agentic-website] AI pipeline failed, falling back to local generation:", pipelineErr.message.slice(0, 100));
+    }
+
+    // If the AI pipeline didn't produce a usable blueprint, build one locally
+    if (!blueprint) {
+      blueprint = buildLocalBlueprint(intent);
+      // Extract color palette from local blueprint for design system
+      const pal = blueprint?.palette ?? {};
+      designSystem = {
+        primary: pal.primary ?? "#3d5eff",
+        secondary: pal.secondary ?? "#00d4ff",
+        accent: pal.accent ?? "#bf5fff",
+        background: pal.background ?? "#0a0a14",
+        text: pal.text ?? "#f0f0ff",
+        cardStyle: blueprint?.concept?.designStyle === "Luxury" ? "glass" : "solid",
+      };
+    }
 
     const code = generateAllCode(blueprint);
 
@@ -140,9 +190,11 @@ router.post("/generate-agentic-website", async (req, res) => {
         sampleSection: code.sampleSection,
         installCmd:    code.installCmd,
       },
-      designSystem: result.phases.designer ?? {},
+      designSystem,
+      config: getConfigStatus(),
     });
   } catch (err) {
+    console.error("[generate-agentic-website] Fatal error:", err);
     res.status(500).json({ error: err.message });
   }
 });
