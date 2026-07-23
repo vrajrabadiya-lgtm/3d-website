@@ -1,7 +1,7 @@
 import express from "express";
 import Project from "../models/Project.js";
 import { authMiddleware } from "./auth.js";
-
+import { enqueueProjectGeneration } from "../queue/queues/projectQueue.js";
 const router = express.Router();
 
 // All project routes require authentication
@@ -19,15 +19,33 @@ router.post("/", async (req, res) => {
       });
     }
 
+    console.log("[Project] Creating project...");
+
     const newProject = new Project({
       userId: req.userId,
       title,
       prompt,
       thumbnail,
-      metadata: metadata || {}
+      metadata: metadata || {},
+      status: "PENDING",
+      progress: 0
     });
 
     const savedProject = await newProject.save();
+    console.log("[Project] Project saved.");
+
+    try {
+      await enqueueProjectGeneration({
+        projectId: savedProject._id,
+        userId: savedProject.userId,
+        title: savedProject.title,
+        prompt: savedProject.prompt
+      });
+      console.log("[Project] Job queued.");
+    } catch (queueError) {
+      console.error("[Project] Error enqueueing job:", queueError);
+      return res.status(500).json({ success: false, message: "Project saved but failed to enqueue generation job." });
+    }
 
     return res.status(201).json({
       success: true,
