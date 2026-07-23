@@ -5,6 +5,33 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function HeroSection() {
     const [prompt, setPrompt] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    const handleStart = async () => {
+        if (!prompt.trim()) return;
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch(
+                `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/ai/generate-agentic-website`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ prompt }),
+                }
+            );
+            if (!res.ok) throw new Error((await res.json()).error || "Generation failed");
+            const data = await res.json();
+            // Store result and redirect to builder
+            sessionStorage.setItem("ai_result", JSON.stringify(data));
+            window.location.hash = "#3d-builder";
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <section className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden font-sans select-none">
@@ -71,14 +98,29 @@ export default function HeroSection() {
 
                         {/* Submit Start Button */}
                         <Button
-                            disabled={!prompt.trim()}
+                            disabled={!prompt.trim() || loading}
+                            onClick={handleStart}
                             className="h-auto flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white disabled:opacity-40 disabled:hover:bg-zinc-800 disabled:hover:text-zinc-400 disabled:text-zinc-400 transition-all shadow-none"
                         >
-                            <Send className="h-3 w-3" />
-                            <span>Start</span>
+                            {loading ? (
+                                <>
+                                    <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                    <span>Generating...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Send className="h-3 w-3" />
+                                    <span>Start</span>
+                                </>
+                            )}
                         </Button>
                     </div>
                 </div>
+
+                {/* Error message */}
+                {error && (
+                    <p className="text-[11px] text-red-400 font-medium mb-2">{error}</p>
+                )}
 
                 {/* Small Notice Label Beneath input block */}
                 <p className="text-[10px] font-medium text-zinc-400/80 tracking-wide mb-8">

@@ -19,6 +19,7 @@ import { runAgenticWebsitePipeline } from "../core/AgentWebsiteOrchestrator.js";
 import { generateAllCode } from "../core/CodeGenerator.js";
 import { generateWebsiteBlueprint } from "../core/WebsiteBlueprintEngine.js";
 import { resolveUserCredits } from "../lib/ai-clients.js";
+import { buildLocalBlueprint } from "../core/BlueprintGenerator.js";
 
 const router = Router();
 
@@ -97,12 +98,50 @@ router.post("/generate-agentic-website", async (req, res) => {
     }
 
     const intent = analyzePrompt(prompt);
-    const result = await runAgenticWebsitePipeline({
-      plan: "free",
-      prompt,
-    });
+    const result = await runAgenticWebsitePipeline({ plan: "free", prompt });
 
-    res.json({ result, plan: intent });
+    // Generate the 3 renderable components from the pipeline's blueprint
+    const blueprint = result?.phases?.code?.files
+      ? {
+          websiteBlueprint: {
+            website_name: result.phases.planner?.projectType ?? "My Site",
+            business_type: result.phases.planner?.projectType ?? "technology",
+            design_style: result.phases.designer?.cardStyle ?? "Futuristic",
+            color_palette: {
+              primary:    result.phases.designer?.primary    ?? "#3d5eff",
+              secondary:  result.phases.designer?.secondary  ?? "#00d4ff",
+              accent:     result.phases.designer?.accent     ?? "#bf5fff",
+              background: result.phases.designer?.background ?? "#0a0a14",
+              text:       result.phases.designer?.text       ?? "#f0f0ff",
+            },
+            hero: {
+              headline:      `Welcome to ${result.phases.planner?.projectType ?? "My Site"}`,
+              subheadline:   prompt,
+              cta_primary:   "Get Started",
+              cta_secondary: "Learn More",
+              layout:        result.phases.designer?.layout?.heroMode ?? "split",
+              three_d_object: { type: result.phases.threeDScene?.heroObject ?? "floating-sphere" },
+            },
+            sections: result.phases.componentPlanner?.components
+              ?.filter(c => !["Navbar","Footer"].includes(c.name))
+              .map(c => ({ type: "features", title: c.name, id: c.name.toLowerCase() })) ?? [],
+          },
+        }
+      : buildLocalBlueprint(intent);
+
+    const code = generateAllCode(blueprint);
+
+    res.json({
+      result,
+      plan: intent,
+      components: {
+        heroJSX:       code.heroJSX,
+        sceneJSX:      code.sceneJSX,
+        sampleSection: code.sampleSection,
+        installCmd:    code.installCmd,
+      },
+      designSystem: result.phases.designer ?? {},
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
