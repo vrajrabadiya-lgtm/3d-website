@@ -5,6 +5,28 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function HeroSection() {
     const [prompt, setPrompt] = useState("");
+    const [loading, setLoading] = useState(false);
+
+    const handleStart = async () => {
+        if (!prompt.trim()) return;
+        setLoading(true);
+        try {
+            const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+            const res = await fetch(`${backendUrl}/api/ai/generate-blueprint`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt })
+            });
+            const data = await res.json();
+            console.log("AI Blueprint Generation Result:", data);
+            alert("AI Blueprint generated successfully! Check your browser console to see the JSON output.");
+        } catch (error) {
+            console.error("Error generating AI blueprint:", error);
+            alert("Failed to connect to AI backend. Make sure the server is running.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <section className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden font-sans select-none">
@@ -71,11 +93,12 @@ export default function HeroSection() {
 
                         {/* Submit Start Button */}
                         <Button
-                            disabled={!prompt.trim()}
+                            onClick={handleStart}
+                            disabled={!prompt.trim() || loading}
                             className="h-auto flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-300 hover:bg-zinc-700 hover:text-white disabled:opacity-40 disabled:hover:bg-zinc-800 disabled:hover:text-zinc-400 disabled:text-zinc-400 transition-all shadow-none"
                         >
-                            <Send className="h-3 w-3" />
-                            <span>Start</span>
+                            <Send className={`h-3 w-3 ${loading ? "animate-pulse" : ""}`} />
+                            <span>{loading ? "Building..." : "Start"}</span>
                         </Button>
                     </div>
                 </div>

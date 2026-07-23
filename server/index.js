@@ -44,7 +44,7 @@ app.use(express.json());
 // Routes
 app.use("/api/designs", designRoutes);
 app.use("/api/contact", contactRoutes);
-app.use("/api/auth", authRoutes); 
+app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/ai", aiRoutes);
 
