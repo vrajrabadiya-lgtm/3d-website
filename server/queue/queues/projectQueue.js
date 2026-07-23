@@ -1,7 +1,7 @@
 import { Queue } from "bullmq";
 import { connection } from "../config/redis.js";
 
-const QUEUE_NAME = "project-generation";
+const QUEUE_NAME = "ProjectQueue";
 
 // Configure production-safe defaults
 export const projectQueue = new Queue(QUEUE_NAME, {

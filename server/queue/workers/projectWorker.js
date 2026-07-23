@@ -7,7 +7,7 @@ import { runThreeDSceneAgent } from "../../core/AgentWebsiteOrchestrator.js";
 import { generateAllCode } from "../../core/CodeGenerator.js";
 import { logger } from "../../core/logger.js";
 
-const QUEUE_NAME = "project-generation";
+const QUEUE_NAME = "ProjectQueue";
 
 async function generateMeshyAsset(prompt) {
   const MESHY_API_KEY = process.env.MESHY_API_KEY;
@@ -61,6 +61,7 @@ export const projectWorker = new Worker(
     let currentStage = "Initialization";
     let stageStartTime = Date.now();
     
+    const totalStartTime = Date.now();
     const updateProgress = async (project, progress, stageName) => {
       // Idempotent assignment
       project.progress = progress;
@@ -74,11 +75,10 @@ export const projectWorker = new Worker(
     try {
       const project = await Project.findById(projectId);
       if (!project) {
-        throw new Error(`Project not found with ID: ${projectId}`);
+        throw new Error("Project not found in database");
       }
 
-      // 1. Update to PROCESSING, progress 5
-      currentStage = "Initialization";
+      // 1. Initial Status Update
       project.status = "PROCESSING";
       await updateProgress(project, 5, "Initialization");
       
@@ -98,31 +98,58 @@ export const projectWorker = new Worker(
       project.scenePlan = scenePlan;
       await updateProgress(project, 40, "Scene Planning");
       
-      // 4. Asset Generation
-      currentStage = "Asset Generation";
-      logger.job(jobId, projectId, currentStage, "Started Asset Generation");
-      try {
-        const assets = await generateMeshyAsset(prompt);
-        project.assets = assets;
-      } catch (assetErr) {
-        logger.warn(`Asset generation failed: ${assetErr.message}. Proceeding with fallback.`);
-        project.assets = { fallback: true, status: "fallback", message: assetErr.message };
-      }
-      await updateProgress(project, 60, "Asset Generation");
-      
-      // 5. Code Generation
-      currentStage = "Code Generation";
-      logger.job(jobId, projectId, currentStage, "Started Code Generation");
-      const code = generateAllCode(blueprint);
-      project.generatedCode = {
-        heroJSX: code.heroJSX,
-        sceneJSX: code.sceneJSX,
-        sampleSection: code.sampleSection,
-        fileTree: code.fileTree,
-        appJSX: code.appJSX,
-        installCmd: code.installCmd
+      // 4. Parallel Asset & Code Generation
+      currentStage = "Parallel Asset & Code Generation";
+      logger.job(jobId, projectId, currentStage, "Started parallel Asset & Code Generation");
+
+      let parallelProgress = 40;
+      const bumpProgress = async (stageName) => {
+        parallelProgress = parallelProgress === 40 ? 65 : 85;
+        await Project.updateOne({ _id: project._id }, { $set: { progress: parallelProgress } });
+        project.progress = parallelProgress;
+        
+        const duration = Date.now() - stageStartTime;
+        logger.job(jobId, projectId, stageName, `${stageName} completed`, duration);
       };
-      await updateProgress(project, 85, "Code Generation");
+
+      const assetPromise = (async () => {
+        try {
+          const assets = await generateMeshyAsset(prompt);
+          project.assets = assets;
+        } catch (assetErr) {
+          logger.warn(`Asset generation failed: ${assetErr.message}. Proceeding with fallback.`);
+          project.assets = { fallback: true, status: "fallback", message: assetErr.message };
+        }
+        await bumpProgress("Asset Generation");
+      })();
+
+      const codePromise = (async () => {
+        // Run code generation (synchronous but wrapped in promise)
+        const code = generateAllCode(blueprint);
+        project.generatedCode = {
+          heroJSX: code.heroJSX,
+          sceneJSX: code.sceneJSX,
+          sampleSection: code.sampleSection,
+          fileTree: code.fileTree,
+          appJSX: code.appJSX,
+          installCmd: code.installCmd
+        };
+        await bumpProgress("Code Generation");
+      })();
+
+      const [assetResult, codeResult] = await Promise.allSettled([assetPromise, codePromise]);
+
+      // Persist the partial/complete generated components
+      await project.save();
+
+      if (codeResult.status === "rejected") {
+        currentStage = "Code Generation";
+        throw codeResult.reason;
+      }
+      if (assetResult.status === "rejected") {
+        currentStage = "Asset Generation";
+        throw assetResult.reason;
+      }
       
       // 6. Thumbnail Generation (Skipped)
       currentStage = "Thumbnail Generation";
@@ -136,8 +163,9 @@ export const projectWorker = new Worker(
       project.completedAt = new Date();
       await project.save();
       
-      logger.job(jobId, projectId, currentStage, "Project completed successfully");
-      return { success: true, message: "Pipeline completed successfully" };
+      const totalDuration = Date.now() - totalStartTime;
+      logger.job(jobId, projectId, currentStage, `Project completed successfully in ${totalDuration}ms`, totalDuration);
+      return { success: true, message: "Pipeline completed successfully", duration: totalDuration };
       
     } catch (error) {
       logger.error(`Job failed at ${currentStage}`, error, { jobId, projectId });
