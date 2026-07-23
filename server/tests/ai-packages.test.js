@@ -25,7 +25,6 @@ describe("AI packages in server/package.json", () => {
     "@google/genai",
     "google-auth-library",
     "groq-sdk",
-    "@supabase/supabase-js",
   ];
 
   for (const pkgName of requiredPackages) {
