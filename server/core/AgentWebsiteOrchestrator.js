@@ -69,7 +69,7 @@ Return JSON:
   return parseJsonResponse(raw, "UI Designer Agent");
 }
 
-async function runThreeDSceneAgent(plan, prompt, intent, designSystem) {
+export async function runThreeDSceneAgent(plan, prompt, intent, designSystem) {
   const system = `You are 3D Scene Agent.
 Return only JSON. No markdown.
 Create an implementable React Three Fiber scene plan.`;

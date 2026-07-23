@@ -34,3 +34,7 @@ build/
 *.njsproj
 *.sln
 *.sw?
+
+# Cloud Credentials
+AI/
+*.json.key
