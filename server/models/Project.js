@@ -35,6 +35,35 @@ const projectSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    blueprint: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    plan: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    scenePlan: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    assets: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    generatedCode: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    failedStage: {
+      type: String,
+    },
+    startedAt: {
+      type: Date,
+    },
+    completedAt: {
+      type: Date,
+    },
+    error: {
+      message: String,
+      errorType: String,
+      code: String,
+    },
   },
   {
     timestamps: true,

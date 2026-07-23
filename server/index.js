@@ -8,6 +8,10 @@ import contactRoutes from "./routes/contactRoutes.js";
 import authRoutes from "./routes/auth.js";
 import projectRoutes from "./routes/projects.js";
 import aiRoutes from "./routes/ai.js";
+import { validateConfig } from "./core/configValidator.js";
+
+// Validate configuration on startup
+validateConfig();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

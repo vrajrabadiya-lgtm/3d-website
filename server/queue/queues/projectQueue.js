@@ -20,9 +20,12 @@ export const projectQueue = new Queue(QUEUE_NAME, {
 /**
  * Reusable helper: Enqueue a project generation task
  */
-export async function enqueueProjectGeneration(jobData) {
+export async function enqueueProjectGeneration(jobData, options = {}) {
   try {
-    const job = await projectQueue.add("generate-website", jobData);
+    const job = await projectQueue.add("generate-website", jobData, {
+      jobId: jobData.projectId.toString(), // Idempotency key must be string
+      ...options
+    });
     console.log(`[Queue] Job enqueued successfully: ${job.id}`);
     return job;
   } catch (error) {
