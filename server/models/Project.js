@@ -60,7 +60,9 @@ const projectSchema = new mongoose.Schema(
       type: Date,
     },
     error: {
-      type: String,
+      message: String,
+      errorType: String,
+      code: String,
     },
   },
   {
