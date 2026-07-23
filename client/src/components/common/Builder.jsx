@@ -13,7 +13,10 @@ import {
   Save,
   CheckCircle2,
   AlertCircle,
-  Share2
+  Share2,
+  Code2,
+  Eye,
+  X,
 } from "lucide-react";
 
 // Interactive 3D Model that dynamically reflects state variables
@@ -140,6 +143,24 @@ export default function Builder() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState(null);
   const [apiStatus, setApiStatus] = useState({ type: null, message: "" });
+
+  // 3. AI Generated Website State
+  const [aiResult, setAiResult] = useState(null);
+  const [aiView, setAiView] = useState("preview"); // "preview" | "hero" | "scene" | "section"
+
+  // Load AI result from sessionStorage on mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem("ai_result");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.components) {
+          setAiResult(parsed);
+          sessionStorage.removeItem("ai_result");
+        }
+      } catch {}
+    }
+  }, []);
 
   const BACKEND_URL = `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/designs`;
 
@@ -268,6 +289,150 @@ export default function Builder() {
       
       {/* Background visual ambience */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,#090d16,transparent_60%)] pointer-events-none" />
+
+      {/* ── AI GENERATED WEBSITE PREVIEW PANEL ─────────────────────────── */}
+      {aiResult && (
+        <div className="absolute inset-0 z-50 bg-zinc-950 flex flex-col">
+          {/* Panel Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-zinc-900/80 backdrop-blur-xl shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                AI Generated
+              </div>
+              <span className="text-xs font-semibold text-zinc-300">3 Components Ready</span>
+            </div>
+
+            {/* Tab switcher */}
+            <div className="flex items-center gap-1 bg-zinc-800/60 rounded-lg p-1">
+              {[
+                { id: "preview", label: "Preview" },
+                { id: "hero",    label: "Hero JSX" },
+                { id: "scene",   label: "Scene JSX" },
+                { id: "section", label: "Section JSX" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setAiView(tab.id)}
+                  className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
+                    aiView === tab.id
+                      ? "bg-zinc-700 text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setAiResult(null)}
+              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Panel Body */}
+          <div className="flex-1 overflow-hidden">
+            {aiView === "preview" ? (
+              // Live preview: show design system info + component summary
+              <div className="h-full overflow-y-auto p-6 space-y-6">
+                {/* Design System */}
+                {aiResult.designSystem && Object.keys(aiResult.designSystem).length > 0 && (
+                  <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-5">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-4">Design System</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {["background", "primary", "secondary", "accent"].map((key) => {
+                        const val = aiResult.designSystem[key];
+                        if (!val || !val.startsWith("#")) return null;
+                        return (
+                          <div key={key} className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg border border-white/10 shrink-0" style={{ background: val }} />
+                            <div>
+                              <div className="text-[10px] text-zinc-500 capitalize">{key}</div>
+                              <div className="text-[11px] font-mono text-zinc-300">{val}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3 Component Cards */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  {[
+                    { label: "Hero Component",    key: "heroJSX",       icon: "🖼️",  desc: "Full-screen hero section with 3D canvas" },
+                    { label: "3D Scene",           key: "sceneJSX",      icon: "🌐",  desc: "React Three Fiber cinematic scene" },
+                    { label: "Features Section",  key: "sampleSection", icon: "⚡",  desc: "Industry-specific features layout" },
+                  ].map((comp) => (
+                    <div
+                      key={comp.key}
+                      className="rounded-2xl border border-white/10 bg-zinc-900/40 p-5 flex flex-col gap-3"
+                    >
+                      <div className="text-3xl">{comp.icon}</div>
+                      <div>
+                        <div className="text-sm font-bold text-zinc-100">{comp.label}</div>
+                        <div className="text-[11px] text-zinc-500 mt-0.5">{comp.desc}</div>
+                      </div>
+                      <div className="mt-auto flex items-center justify-between">
+                        <span className="text-[10px] text-emerald-400 font-semibold">✓ Ready</span>
+                        <button
+                          onClick={() => setAiView(comp.key === "heroJSX" ? "hero" : comp.key === "sceneJSX" ? "scene" : "section")}
+                          className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                        >
+                          <Code2 className="h-3 w-3" />
+                          View Code
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Install command */}
+                {aiResult.components?.installCmd && (
+                  <div className="rounded-xl border border-white/10 bg-zinc-900/60 p-4">
+                    <div className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">Install Dependencies</div>
+                    <code className="text-[11px] font-mono text-emerald-300 break-all">{aiResult.components.installCmd}</code>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Code view
+              <div className="h-full flex flex-col">
+                <div className="flex items-center gap-2 px-5 py-2.5 border-b border-white/10 bg-zinc-900/40 shrink-0">
+                  <Code2 className="h-3.5 w-3.5 text-zinc-400" />
+                  <span className="text-[11px] font-mono text-zinc-400">
+                    {aiView === "hero" ? "Hero.jsx" : aiView === "scene" ? "Cinematic3DScene.jsx" : "FeaturesSection.jsx"}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const code = aiView === "hero"
+                        ? aiResult.components.heroJSX
+                        : aiView === "scene"
+                        ? aiResult.components.sceneJSX
+                        : aiResult.components.sampleSection;
+                      navigator.clipboard.writeText(code);
+                      setApiStatus({ type: "success", message: "Code copied to clipboard!" });
+                    }}
+                    className="ml-auto text-[10px] text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <pre className="flex-1 overflow-auto p-5 text-[11px] font-mono text-zinc-300 leading-relaxed whitespace-pre-wrap break-words">
+                  {aiView === "hero"
+                    ? aiResult.components.heroJSX
+                    : aiView === "scene"
+                    ? aiResult.components.sceneJSX
+                    : aiResult.components.sampleSection}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 1. LEFT SIDEBAR PANEL: Controls */}
       <aside className="w-full md:w-[400px] border-b md:border-b-0 md:border-r border-white/10 bg-zinc-950/80 backdrop-blur-xl flex flex-col z-20 shrink-0 h-1/2 md:h-full">
