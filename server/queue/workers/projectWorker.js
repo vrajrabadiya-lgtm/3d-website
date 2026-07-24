@@ -6,8 +6,10 @@ import { generateBlueprint } from "../../core/BlueprintGenerator.js";
 import { runThreeDSceneAgent } from "../../core/AgentWebsiteOrchestrator.js";
 import { generateAllCode } from "../../core/CodeGenerator.js";
 import { logger } from "../../core/logger.js";
+import { ProjectBuilder } from "../../core/ProjectBuilder.js";
+import { BuildDiagnostics } from "../../core/BuildDiagnostics.js";
 
-const QUEUE_NAME = "project-generation";
+const QUEUE_NAME = "ProjectQueue";
 
 async function generateMeshyAsset(prompt) {
   const MESHY_API_KEY = process.env.MESHY_API_KEY;
@@ -61,6 +63,7 @@ export const projectWorker = new Worker(
     let currentStage = "Initialization";
     let stageStartTime = Date.now();
     
+    const totalStartTime = Date.now();
     const updateProgress = async (project, progress, stageName) => {
       // Idempotent assignment
       project.progress = progress;
@@ -74,11 +77,10 @@ export const projectWorker = new Worker(
     try {
       const project = await Project.findById(projectId);
       if (!project) {
-        throw new Error(`Project not found with ID: ${projectId}`);
+        throw new Error("Project not found in database");
       }
 
-      // 1. Update to PROCESSING, progress 5
-      currentStage = "Initialization";
+      // 1. Initial Status Update
       project.status = "PROCESSING";
       await updateProgress(project, 5, "Initialization");
       
@@ -98,46 +100,130 @@ export const projectWorker = new Worker(
       project.scenePlan = scenePlan;
       await updateProgress(project, 40, "Scene Planning");
       
-      // 4. Asset Generation
-      currentStage = "Asset Generation";
-      logger.job(jobId, projectId, currentStage, "Started Asset Generation");
-      try {
-        const assets = await generateMeshyAsset(prompt);
-        project.assets = assets;
-      } catch (assetErr) {
-        logger.warn(`Asset generation failed: ${assetErr.message}. Proceeding with fallback.`);
-        project.assets = { fallback: true, status: "fallback", message: assetErr.message };
-      }
-      await updateProgress(project, 60, "Asset Generation");
-      
-      // 5. Code Generation
-      currentStage = "Code Generation";
-      logger.job(jobId, projectId, currentStage, "Started Code Generation");
-      const code = generateAllCode(blueprint);
-      project.generatedCode = {
-        heroJSX: code.heroJSX,
-        sceneJSX: code.sceneJSX,
-        sampleSection: code.sampleSection,
-        fileTree: code.fileTree,
-        appJSX: code.appJSX,
-        installCmd: code.installCmd
+      // 4. Parallel Asset & Code Generation
+      currentStage = "Parallel Asset & Code Generation";
+      logger.job(jobId, projectId, currentStage, "Started parallel Asset & Code Generation");
+
+      let parallelProgress = 40;
+      const bumpProgress = async (stageName) => {
+        parallelProgress = parallelProgress === 40 ? 65 : 85;
+        await Project.updateOne({ _id: project._id }, { $set: { progress: parallelProgress } });
+        project.progress = parallelProgress;
+        
+        const duration = Date.now() - stageStartTime;
+        logger.job(jobId, projectId, stageName, `${stageName} completed`, duration);
       };
-      await updateProgress(project, 85, "Code Generation");
+
+      const assetPromise = (async () => {
+        try {
+          const assets = await generateMeshyAsset(prompt);
+          project.assets = assets;
+        } catch (assetErr) {
+          logger.warn(`Asset generation failed: ${assetErr.message}. Proceeding with fallback.`);
+          project.assets = { fallback: true, status: "fallback", message: assetErr.message };
+        }
+        await bumpProgress("Asset Generation");
+      })();
+
+      const codePromise = (async () => {
+        // Run code generation (synchronous but wrapped in promise)
+        const code = generateAllCode(blueprint);
+        project.generatedCode = {
+          heroJSX: code.heroJSX,
+          sceneJSX: code.sceneJSX,
+          sampleSection: code.sampleSection,
+          fileTree: code.fileTree,
+          appJSX: code.appJSX,
+          installCmd: code.installCmd
+        };
+        await bumpProgress("Code Generation");
+      })();
+
+      const [assetResult, codeResult] = await Promise.allSettled([assetPromise, codePromise]);
+
+      // Persist the partial/complete generated components
+      await project.save();
+
+      if (codeResult.status === "rejected") {
+        currentStage = "Code Generation";
+        throw codeResult.reason;
+      }
+      if (assetResult.status === "rejected") {
+        currentStage = "Asset Generation";
+        throw assetResult.reason;
+      }
       
       // 6. Thumbnail Generation (Skipped)
       currentStage = "Thumbnail Generation";
       logger.job(jobId, projectId, currentStage, "Thumbnail skipped");
-      await updateProgress(project, 95, "Thumbnail Generation");
+      await updateProgress(project, 90, "Thumbnail Generation");
       
-      // 7. Completion
+      // Initialize Builder
+      const builder = new ProjectBuilder(projectId);
+
+      try {
+        // 7. Project Builder
+        currentStage = "Project Builder";
+        logger.job(jobId, projectId, currentStage, "Project Builder Started");
+        await builder.setupProject(project);
+        await updateProgress(project, 94, "Project Builder");
+
+        // 8. Build Verification
+        currentStage = "Build Verification";
+        logger.job(jobId, projectId, currentStage, "Build Started");
+        const buildResults = await builder.verifyBuild();
+        project.buildStatus = buildResults.status;
+        project.buildLogs = buildResults.logs;
+        project.buildStartedAt = buildResults.startedAt;
+        project.buildCompletedAt = buildResults.completedAt;
+        if (buildResults.error || buildResults.status === "FAILED") {
+          logger.warn(`Build verification failed but continuing: ${buildResults.error || 'Build script failed'}`);
+          
+          logger.job(jobId, projectId, "Build Diagnostics Started", "Analyzing build failure logs");
+          const diagnostics = BuildDiagnostics.analyzeLogs(buildResults.logs);
+          project.buildDiagnostics = diagnostics;
+          logger.job(jobId, projectId, "Detected Category", diagnostics.category);
+          logger.job(jobId, projectId, "Detected Summary", diagnostics.summary);
+          logger.job(jobId, projectId, "Diagnostics Stored", "Structured diagnostics saved to MongoDB");
+        } else {
+          logger.job(jobId, projectId, currentStage, "Build Completed");
+        }
+        await project.save();
+        await updateProgress(project, 97, "Build Verification");
+
+        // 9. ZIP Generation
+        currentStage = "ZIP Generation";
+        logger.job(jobId, projectId, currentStage, "ZIP Started");
+        const zipMetadata = await builder.generateZip();
+        project.artifact = zipMetadata;
+        logger.job(jobId, projectId, currentStage, "ZIP Completed");
+        logger.job(jobId, projectId, "Artifact Storage", "Artifact Stored");
+        await project.save();
+        await updateProgress(project, 99, "ZIP Generation");
+        
+        // 10. Cleanup
+        await builder.cleanup();
+
+      } catch (builderError) {
+        logger.error(`Builder failed at ${currentStage}`, builderError, { jobId, projectId });
+        
+        // If zip failed, try cleanup anyway
+        await builder.cleanup();
+        
+        // Let it throw so it gets caught by the main catch block and sets project to FAILED
+        throw builderError;
+      }
+      
+      // 11. Completion
       currentStage = "Completion";
       project.status = "COMPLETED";
       project.progress = 100;
       project.completedAt = new Date();
       await project.save();
       
-      logger.job(jobId, projectId, currentStage, "Project completed successfully");
-      return { success: true, message: "Pipeline completed successfully" };
+      const totalDuration = Date.now() - totalStartTime;
+      logger.job(jobId, projectId, currentStage, `Project completed successfully in ${totalDuration}ms`, totalDuration);
+      return { success: true, message: "Pipeline completed successfully", duration: totalDuration };
       
     } catch (error) {
       logger.error(`Job failed at ${currentStage}`, error, { jobId, projectId });

@@ -3,7 +3,7 @@ import { connection } from "../config/redis.js";
 import { logger } from "../../core/logger.js";
 import { projectQueue } from "../queues/projectQueue.js";
 
-const QUEUE_NAME = "project-generation";
+const QUEUE_NAME = "ProjectQueue";
 
 export const queueEvents = new QueueEvents(QUEUE_NAME, { connection });
 
@@ -30,8 +30,13 @@ queueEvents.on("stalled", ({ jobId }) => {
 // Periodic Queue Monitoring
 setInterval(async () => {
   try {
-    const counts = await projectQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed');
-    logger.info("Queue Metrics", { metrics: counts });
+    const waiting = await projectQueue.getWaitingCount();
+    const active = await projectQueue.getActiveCount();
+    const completed = await projectQueue.getCompletedCount();
+    const failed = await projectQueue.getFailedCount();
+    
+    console.log(`\nQueue Metrics\nWaiting: ${waiting}\nActive: ${active}\nCompleted: ${completed}\nFailed: ${failed}\n`);
+    logger.info("Queue Metrics", { metrics: { waiting, active, completed, failed } });
   } catch (error) {
     logger.error("Failed to fetch queue metrics", error);
   }
